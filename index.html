@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TKB → Google Calendar</title>
+  <meta name="description" content="Chuyển thời khóa biểu đại học Việt Nam sang Google Calendar. Paste từ Excel, tải file ICS.">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #ffffff;
+      --bg2: #f5f5f5;
+      --border: #d0d0d0;
+      --border2: #e8e8e8;
+      --txt: #111111;
+      --txt2: #555555;
+      --txt3: #888888;
+      --accent: #111111;
+      --accent-light: #f0f0f0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--txt);
+      min-height: 100vh;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    /* ── Header ── */
+    header {
+      padding: 14px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #fff;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .logo {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--txt);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .logo-ic {
+      width: 28px; height: 28px;
+      background: #111;
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px;
+      color: #fff;
+    }
+    .header-badge {
+      font-size: 11px;
+      color: var(--txt3);
+      border: 1px solid var(--border);
+      padding: 3px 10px;
+      border-radius: 20px;
+    }
+
+    /* ── Layout ── */
+    .wrap { max-width: 780px; margin: 0 auto; padding: 0 20px 80px; }
+
+    /* ── Hero ── */
+    .hero { padding: 36px 0 28px; border-bottom: 1px solid var(--border2); margin-bottom: 28px; }
+    .hero h1 { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+    .hero p  { font-size: 13px; color: var(--txt2); }
+
+    /* ── Step bar ── */
+    .steps {
+      display: flex; align-items: center; gap: 0;
+      margin-bottom: 28px;
+    }
+    .step { display: flex; align-items: center; gap: 8px; }
+    .snum {
+      width: 26px; height: 26px; border-radius: 50%;
+      border: 1.5px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 700; color: var(--txt3);
+    }
+    .step.active .snum { background: #111; border-color: #111; color: #fff; }
+    .step.done  .snum { background: #555; border-color: #555; color: #fff; }
+    .slabel { font-size: 12px; color: var(--txt3); }
+    .step.active .slabel { color: var(--txt); font-weight: 600; }
+    .scon { width: 40px; height: 1px; background: var(--border); margin: 0 8px; }
+
+    /* ── Card / Section ── */
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 16px;
+      background: #fff;
+    }
+    .ctitle { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+    .cdesc  { font-size: 12px; color: var(--txt2); margin-bottom: 14px; }
+
+    .sec { display: none; }
+    .sec.active { display: block; }
+
+    /* ── Form ── */
+    .frow { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+    .fg   { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 180px; }
+    label { font-size: 11px; font-weight: 600; color: var(--txt2); text-transform: uppercase; letter-spacing: .04em; }
+
+    input[type="text"], input[type="number"], select, textarea {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 9px 12px;
+      color: var(--txt);
+      font-family: inherit;
+      font-size: 13px;
+      outline: none;
+      transition: border-color .15s;
+    }
+    input:focus, select:focus, textarea:focus { border-color: #111; }
+    textarea {
+      resize: vertical;
+      min-height: 260px;
+      font-size: 12px;
+      line-height: 1.6;
+      font-family: 'Courier New', monospace;
+    }
+    textarea::placeholder { color: #bbb; font-family: inherit; font-size: 12px; }
+
+    /* date text input — red highlight */
+    #semStart {
+      border: 2px solid #cc0000;
+      color: #cc0000;
+      font-weight: 700;
+      font-size: 15px;
+      letter-spacing: .05em;
+      max-width: 200px;
+    }
+    #semStart:focus { border-color: #990000; outline: none; }
+    #semStart::placeholder { color: #ffaaaa; font-weight: 400; font-size: 13px; }
+
+    /* Week +/- buttons */
+    .wk-nav {
+      display: flex; align-items: center; gap: 10px; margin-bottom: 14px;
+    }
+    .wk-btn {
+      width: 34px; height: 34px; border-radius: 6px;
+      border: 1.5px solid #111; background: #fff;
+      font-size: 18px; font-weight: 700; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background .12s;
+    }
+    .wk-btn:hover { background: #111; color: #fff; }
+    .wk-btn:disabled { border-color: #ddd; color: #ccc; cursor: default; background: #fff; }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 9px 18px; border-radius: 6px; border: 1px solid var(--border);
+      cursor: pointer; font-family: inherit;
+      font-size: 13px; font-weight: 600;
+      background: #fff; color: var(--txt);
+      transition: background .15s;
+      text-decoration: none;
+    }
+    .btn:hover { background: var(--bg2); }
+    .btn-p {
+      background: #111; color: #fff; border-color: #111;
+    }
+    .btn-p:hover { background: #333; }
+    .btn-g {
+      background: #111; color: #fff; border-color: #111; font-weight: 700;
+    }
+    .btn-g:hover { background: #333; }
+    .btn-lg { padding: 11px 22px; font-size: 14px; }
+
+    /* ── Alert ── */
+    .alert {
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      margin-bottom: 14px;
+      border: 1px solid var(--border);
+      background: var(--bg2);
+      color: var(--txt2);
+      line-height: 1.5;
+    }
+
+    /* ── Stats ── */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+    .scard {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 14px;
+      text-align: center;
+    }
+    .sval { font-size: 26px; font-weight: 800; color: #111; }
+    .slb  { font-size: 11px; color: var(--txt3); margin-top: 2px; }
+
+    /* ── Subject list ── */
+    .sublist { display: flex; flex-direction: column; gap: 8px; }
+    .subitem {
+      border: 1px solid var(--border2);
+      border-radius: 6px;
+      padding: 12px 14px;
+      display: flex; align-items: flex-start; gap: 12px;
+    }
+    .subcol { width: 3px; min-height: 40px; border-radius: 3px; flex-shrink: 0; background: #111; }
+    .subname { font-size: 13px; font-weight: 600; margin-bottom: 3px; }
+    .submeta { font-size: 11px; color: var(--txt3); display: flex; gap: 12px; flex-wrap: wrap; }
+    .tag {
+      display: inline-block; padding: 2px 8px;
+      border: 1px solid var(--border); border-radius: 20px;
+      font-size: 10px; font-weight: 600; color: var(--txt2);
+    }
+
+    /* ── Week calendar ── */
+    .wkcal-wrap { overflow-x: auto; }
+    .wkcal {
+      display: grid; grid-template-columns: repeat(6, 1fr);
+      gap: 6px; min-width: 640px;
+    }
+    .wkday-hd {
+      text-align: center; font-size: 11px; font-weight: 700;
+      color: var(--txt2); padding: 7px;
+      border-bottom: 1.5px solid #111;
+    }
+    .wkday-col { padding: 6px; min-height: 80px; }
+    .wkblk {
+      border: 1px solid var(--border);
+      border-left: 3px solid #111;
+      border-radius: 4px;
+      padding: 7px 9px;
+      margin-bottom: 5px;
+      background: var(--bg2);
+    }
+    .wkblk-name { font-size: 11px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .wkblk-time { font-size: 10px; color: var(--txt3); margin-top: 2px; }
+    .wkblk-room { font-size: 10px; color: var(--txt3); }
+    .wkempty { text-align: center; color: #ccc; font-size: 12px; padding: 18px 0; }
+
+    /* ── Preview table ── */
+    .ptable { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .ptable th {
+      background: var(--bg2); padding: 8px 12px;
+      text-align: left; font-size: 11px; font-weight: 700;
+      color: var(--txt2); text-transform: uppercase;
+      border-bottom: 1px solid var(--border);
+    }
+    .ptable td {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border2);
+      vertical-align: middle;
+    }
+    .ptable tr:last-child td { border-bottom: none; }
+    .badge {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 22px; height: 22px; padding: 0 6px;
+      border-radius: 11px; background: var(--bg2);
+      color: var(--txt); font-size: 11px; font-weight: 700;
+      border: 1px solid var(--border);
+    }
+
+    /* ── Import steps ── */
+    .imp-steps { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+    .imp-step {
+      display: flex; align-items: flex-start; gap: 12px;
+      padding: 12px 14px;
+      border: 1px solid var(--border2);
+      border-radius: 6px;
+    }
+    .imp-n {
+      width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
+      background: #111; color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 800;
+    }
+    .imp-title { font-weight: 700; font-size: 13px; margin-bottom: 2px; }
+    .imp-desc  { font-size: 12px; color: var(--txt2); line-height: 1.5; }
+    .imp-desc a { color: #111; font-weight: 600; }
+
+    /* ── Paste indicator ── */
+    #pasteIndicator {
+      margin-top: 10px;
+      padding: 10px 14px;
+      border: 1px solid #bbb;
+      border-radius: 6px;
+      background: var(--bg2);
+      font-size: 13px;
+      font-weight: 600;
+      color: #333;
+    }
+
+    /* ── Responsive ── */
+    @media(max-width: 640px) {
+      header { padding: 12px 16px; }
+      .wrap  { padding: 0 14px 60px; }
+      .card  { padding: 16px 14px; }
+      .frow  { flex-direction: column; }
+      .slabel { display: none; }
+      .scon { width: 20px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-ic">📅</div>
+    TKB → Calendar
+  </div>
+  <div class="header-badge">Đại Học Luật</div>
+</header>
+
+<div class="wrap">
+
+  <div class="hero">
+    <h1>Dịch Thời Khóa Biểu sang Google Calendar</h1>
+    <p>Copy toàn bộ TKB từ Excel → Paste vào đây → Tải file ICS → Import vào Google Calendar.</p>
+  </div>
+
+  <!-- Step bar -->
+  <div class="steps">
+    <div class="step active" id="si1"><div class="snum">1</div><div class="slabel">Nhập TKB</div></div>
+    <div class="scon"></div>
+    <div class="step" id="si2"><div class="snum">2</div><div class="slabel">Xem lại</div></div>
+    <div class="scon"></div>
+    <div class="step" id="si3"><div class="snum">3</div><div class="slabel">Xuất Calendar</div></div>
+  </div>
+
+  <!-- ── STEP 1 ── -->
+  <div class="sec active" id="sec1">
+
+    <div class="card" style="border-color:#ffcccc;background:#fffafa">
+      <div class="ctitle" style="color:#cc0000">📌 Ngày bắt đầu Tuần 1 <span style="font-size:11px;font-weight:400;color:#cc0000">(bắt buộc)</span></div>
+      <div class="cdesc" style="color:#cc0000">Nhập ngày thứ Hai của tuần đầu tiên. Định dạng: <strong>ngày/tháng/năm</strong></div>
+      <input type="text" id="semStart" placeholder="19/01/2026" maxlength="10" inputmode="numeric">
+    </div>
+
+    <div class="card">
+      <div class="ctitle">📋 Dán nội dung TKB</div>
+      <div class="alert">💡 Vào file Excel, nhấn ô bất kỳ → Ctrl+A → Ctrl+C → Ctrl+V vào đây.</div>
+      <div style="position:relative">
+        <textarea id="tkbInput" oninput="onTkbInput(this)" onpaste="onTkbPaste(this)" placeholder="Dán nội dung TKB vào đây...
+
+Ví dụ (ĐH Luật TP.HCM):
+BỘ GIÁO DỤC VÀ ĐÀO TẠO								CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM
+	TRƯỜNG ĐẠI HỌC LUẬT TP.HCM								Độc lập - Tự do - Hạnh phúc
+
+					THỜI KHÓA BIỂU LỚP
+					Học kỳ: 02 - Năm học: 2025-2026
+
+	Lớp: 157-CLC48QTL(A) (Sĩ Số: 0) - Khoa: Luật (CLC)
+	Tuần bắt đầu học kỳ : tuần  1 (19/01/2026)
+
+TT					Lớp học phần		Tên học phần				Số TC	Loại HP	Thứ	Tiết            1234567890123456					Phòng					Tuần học
+1					CLC30301		Corporation Law (Luật công ty)				2	Lý thuyết	Thứ Tư	______7890________					A.608NTT					__________1_3_____________
+2					CLC30301		Corporation Law (Luật công ty)				2	Lý thuyết	Thứ Sáu	______7890________					A.608NTT					12_____890123_____________
+3					MAR30303		Marketing căn bản				2	Lý thuyết	Thứ Hai	12345_____________					A.608NTT					12____7890_23_____________"></textarea>
+        <div id="pasteIndicator" style="display:none">
+          ✅ Đã dán thành công! Nhấn <strong>Phân tích TKB</strong> để tiếp tục.
+        </div>
+      </div>
+      <div style="margin-top:14px">
+        <button class="btn btn-p btn-lg" id="parseBtn" onclick="doParseAndNext()">🔍 Phân tích TKB</button>
+      </div>
+    </div>
+
+  </div><!-- /sec1 -->
+
+  <!-- ── STEP 2 ── -->
+  <div class="sec" id="sec2">
+
+    <div class="card">
+      <div class="ctitle">✅ Kết quả phân tích</div>
+      <div class="cdesc" id="parseSummary">Đã phân tích thành công.</div>
+      <div class="stats" id="statsGrid"></div>
+      <div class="alert" id="parseWarn" style="display:none"></div>
+    </div>
+
+    <div class="card">
+      <div class="ctitle">📚 Danh sách môn học</div>
+      <div class="sublist" id="subList"></div>
+    </div>
+
+    <div class="card">
+      <div class="ctitle">📅 Thời khóa biểu theo tuần</div>
+      <div class="wk-nav">
+        <button class="wk-btn" id="wkPrev" onclick="stepWeek(-1)">−</button>
+        <span id="weekLabel" style="font-size:14px;font-weight:700;min-width:66px;text-align:center">Tuần 1</span>
+        <button class="wk-btn" id="wkNext" onclick="stepWeek(1)">+</button>
+        <span id="weekDateLabel" style="font-size:12px;color:var(--txt3)"></span>
+      </div>
+      <div class="wkcal-wrap"><div id="wkCal"></div></div>
+    </div>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn" onclick="goStep(1)">← Sửa lại</button>
+      <button class="btn btn-p btn-lg" onclick="goStep(3)">Xuất Google Calendar →</button>
+    </div>
+
+  </div><!-- /sec2 -->
+
+  <!-- ── STEP 3 ── -->
+  <div class="sec" id="sec3">
+
+    <div class="card">
+      <div class="ctitle">🎉 Sẵn sàng import vào Google Calendar!</div>
+      <div class="cdesc">Tải file ICS rồi làm theo hướng dẫn bên dưới.</div>
+
+      <div style="margin-bottom:20px">
+        <button class="btn btn-g btn-lg" id="dlBtn" onclick="downloadICS()">⬇️ Tải file ThoiKhoaBieu.ics</button>
+      </div>
+
+      <div class="imp-steps">
+        <div class="imp-step">
+          <div class="imp-n">1</div>
+          <div>
+            <div class="imp-title">Tải file ICS</div>
+            <div class="imp-desc">Nhấn nút đen phía trên để tải toàn bộ lịch học về máy.</div>
+          </div>
+        </div>
+        <div class="imp-step">
+          <div class="imp-n">2</div>
+          <div>
+            <div class="imp-title">Tạo lịch mới (Quan trọng)</div>
+            <div class="imp-desc">Vào <a href="https://calendar.google.com/calendar/u/0/r/settings/createcalendar" target="_blank">Trang Tạo Lịch</a>, đặt tên lịch rồi ấn <strong>Create calendar</strong>.</div>
+          </div>
+        </div>
+        <div class="imp-step">
+          <div class="imp-n">3</div>
+          <div>
+            <div class="imp-title">Import vào lịch vừa tạo</div>
+            <div class="imp-desc">Vào <a href="https://calendar.google.com/calendar/r/settings/export" target="_blank">Import &amp; Export</a>. Tải file ICS lên, <strong>chọn đúng tên lịch vừa tạo</strong> ở mục "Add to calendar" rồi ấn Import.</div>
+          </div>
+        </div>
+        <div class="imp-step">
+          <div class="imp-n">4</div>
+          <div>
+            <div class="imp-title">Xong! 🎉</div>
+            <div class="imp-desc">Toàn bộ lịch học sẽ xuất hiện trên Google Calendar.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="ctitle">📋 Tóm tắt sự kiện sẽ được tạo</div>
+      <div id="evtSummary"></div>
+    </div>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn" onclick="goStep(2)">← Xem lại</button>
+      <button class="btn" onclick="goStep(1)">🔄 Dịch TKB khác</button>
+    </div>
+
+  </div><!-- /sec3 -->
+
+</div><!-- /wrap -->
+
+<script>
+'use strict';
+
+const TIET = {
+  1:  { s:'07:00', e:'07:50' }, 2:  { s:'07:50', e:'08:40' },
+  3:  { s:'08:40', e:'09:30' }, 4:  { s:'09:45', e:'10:35' },
+  5:  { s:'10:35', e:'11:25' }, 6:  { s:'11:25', e:'12:15' },
+  7:  { s:'13:00', e:'13:50' }, 8:  { s:'13:50', e:'14:40' },
+  9:  { s:'14:40', e:'15:30' }, 10: { s:'15:45', e:'16:35' },
+  11: { s:'16:35', e:'17:25' }, 12: { s:'17:25', e:'18:15' },
+  13: { s:'18:15', e:'19:05' }, 14: { s:'19:05', e:'19:55' },
+  15: { s:'19:55', e:'20:45' },
+};
+
+const DAYS = {
+  'hai':  { js:1, vn:'Thứ Hai',  sh:'T2' }, 'ba':   { js:2, vn:'Thứ Ba',   sh:'T3' },
+  'tư':   { js:3, vn:'Thứ Tư',   sh:'T4' }, 'tu':   { js:3, vn:'Thứ Tư',   sh:'T4' },
+  'năm':  { js:4, vn:'Thứ Năm',  sh:'T5' }, 'nam':  { js:4, vn:'Thứ Năm',  sh:'T5' },
+  'sáu':  { js:5, vn:'Thứ Sáu',  sh:'T6' }, 'sau':  { js:5, vn:'Thứ Sáu',  sh:'T6' },
+  'bảy':  { js:6, vn:'Thứ Bảy',  sh:'T7' }, 'bay':  { js:6, vn:'Thứ Bảy',  sh:'T7' },
+  'nhật': { js:0, vn:'Chủ Nhật', sh:'CN' }, 'nhat': { js:0, vn:'Chủ Nhật', sh:'CN' },
+};
+
+let allSessions = [];
+let semStart    = null;
+let totalWks    = 30;
+let previewWeek = 1;
+
+/* ── Navigation ── */
+function goStep(n) {
+  for (let i = 1; i <= 3; i++) {
+    document.getElementById(`sec${i}`).classList.toggle('active', i === n);
+    const ind = document.getElementById(`si${i}`);
+    ind.classList.remove('active','done');
+    if (i < n) ind.classList.add('done');
+    else if (i === n) ind.classList.add('active');
+  }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* ── Parser helpers ── */
+function normAccents(str) {
+  return str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+function parseDayWord(word) {
+  return DAYS[normAccents(word.trim())] || null;
+}
+
+function parseBitmask(str, maxN) {
+  if (!str) return [];
+  const trimmed = str.trim();
+  const rng = trimmed.match(/^(\d+)\s*-\s*(\d+)$/);
+  if (rng) { const out=[]; for(let i=+rng[1];i<=+rng[2];i++) out.push(i); return out; }
+  if (trimmed.includes(',')) return trimmed.split(',').map(Number).filter(n=>n>=1&&n<=(maxN||99));
+  const outPos=[]; let hasChars=false, allMatched=true;
+  for (let i=0; i<str.length && i<(maxN||99); i++) {
+    const c=str[i];
+    if (c!==' ' && c!=='_') {
+      hasChars=true;
+      const expected=((i+1)%10).toString();
+      if (c===expected) outPos.push(i+1); else { allMatched=false; break; }
+    }
+  }
+  if (hasChars && allMatched) return outPos;
+  const n=parseInt(trimmed); return isNaN(n)?[]:[n];
+}
+
+function allWeeks() { return Array.from({length:totalWks},(_,i)=>i+1); }
+
+function buildSession(code,name,credits,type,dayInfo,tiets,room,weeks) {
+  if (!tiets.length) return null;
+  const t0=Math.min(...tiets), t1=Math.max(...tiets);
+  return { code,name,credits,type, dayIndex:dayInfo.js,dayVN:dayInfo.vn,dayShort:dayInfo.sh,
+    tiets,room, weeks:weeks.length?weeks:allWeeks(),
+    startT:TIET[t0]?.s||'07:00', endT:TIET[t1]?.e||'11:25', color:null };
+}
+
+/* ── Tab-separated parser ── */
+function parseTabFormat(text) {
+  const sessions=[], lines=text.split(/\r?\n/);
+  for (const line of lines) {
+    if (!line.includes('\t')) continue;
+    const colsRaw=line.split('\t').map(c=>c.replace(/^"|"$/g,''));
+    const cols=colsRaw.map(c=>c.trim());
+    const dayColIdx=cols.findIndex(c=>/Thứ\s+(Hai|Ba|Tư|Tu|Năm|Nam|Sáu|Sau|Bảy|Bay)/i.test(c));
+    if (dayColIdx<0) continue;
+    const dayM=cols[dayColIdx].match(/Thứ\s+(Hai|Ba|Tư|Tu|Năm|Nam|Sáu|Sau|Bảy|Bay)/i);
+    const dayInfo=parseDayWord(dayM[1]); if (!dayInfo) continue;
+    const afterDay=colsRaw.slice(dayColIdx+1).filter(c=>c.trim()!=='');
+    let tietStr='',room='N/A',tuanStr='';
+    if (afterDay.length>=3) { tietStr=afterDay[0]; room=afterDay[1].trim(); tuanStr=afterDay[2]; }
+    else if (afterDay.length===2) { tietStr=afterDay[0]; if(/^[\d_\s,.-]+$/.test(afterDay[1])) tuanStr=afterDay[1]; else room=afterDay[1].trim(); }
+    else if (afterDay.length===1) tietStr=afterDay[0];
+    let code='N/A',name='Môn học',credits=0,type='Lý thuyết';
+    const codeIdx=cols.findIndex((c,idx)=>idx<dayColIdx&&/^[A-Z]{2,6}\d{4,8}$/.test(c));
+    if (codeIdx>=0) {
+      code=cols[codeIdx];
+      const beforeDay=cols.slice(codeIdx+1,dayColIdx).filter(c=>c!=='');
+      if (beforeDay.length>0) name=beforeDay[0];
+      for (const c of beforeDay) {
+        if (/^\d$/.test(c)) credits=+c;
+        if (/thực\s*hành/i.test(c)) type='Thực hành';
+        if (/lý\s*thu?yết/i.test(c)) type='Lý thuyết';
+      }
+    }
+    const tiets=parseBitmask(tietStr,16).filter(t=>t>=1&&t<=15);
+    const weeks=parseBitmask(tuanStr,totalWks);
+    const s=buildSession(code,name,credits,type,dayInfo,tiets,room,weeks);
+    if (s) sessions.push(s);
+  }
+  return sessions;
+}
+
+/* ── Text parser ── */
+function parseTextFormat(raw) {
+  const sessions=[],warnings=[];
+  const sdM=raw.match(/tu[aâ]n\s*1\s*\(\s*(\d{1,2})\/(\d{1,2})\/(\d{4})\s*\)/i);
+  if (sdM) { const d=new Date(+sdM[3],+sdM[2]-1,+sdM[1]); if(!isNaN(d)){semStart=d;const si=document.getElementById('semStart');if(si&&!si.value)si.value=`${String(sdM[1]).padStart(2,'0')}/${String(sdM[2]).padStart(2,'0')}/${sdM[3]}`;} }
+  const rawLines=raw.split(/\r?\n/), joined=[]; let buf='';
+  for (const l of rawLines) {
+    const t=l.trim();
+    if (!t) { if(buf){joined.push(buf);buf='';} continue; }
+    if (buf&&(t.match(/^\d+\s+[A-Z]{2,}\d{2,}/)||t.match(/^Thứ\s+(Hai|Ba|Tư|Năm|Sáu|Bảy)/i))) { joined.push(buf); buf=t; }
+    else buf=buf?buf+' '+t:t;
+  }
+  if (buf) joined.push(buf);
+  const dayRx=/Thứ\s+(Hai|Ba|Tư|Tu|Năm|Nam|Sáu|Sau|Bảy|Bay)/ig;
+  for (const line of joined) {
+    if (!dayRx.test(line)) continue; dayRx.lastIndex=0;
+    let m;
+    while((m=dayRx.exec(line))!==null){
+      const dayInfo=parseDayWord(m[1]); if(!dayInfo) continue;
+      const dayPos=m.index, afterDay=line.slice(dayPos+m[0].length).trim(), beforeDay=line.slice(0,dayPos).trim();
+      const codeM=beforeDay.match(/\b([A-Z]{2,6}\d{4,8})\b/)||line.match(/\b([A-Z]{2,6}\d{4,8})\b/);
+      const code=codeM?codeM[1]:'N/A';
+      let name='';
+      if (codeM) { const ac=beforeDay.slice(beforeDay.indexOf(codeM[0])+codeM[0].length).trim(); const nmM=ac.match(/^(.+?)\s+\d\s+(?:Lý|Thực)/i); name=nmM?nmM[1].trim():ac.replace(/\s*\d\s*$/,'').trim(); }
+      if (!name||name.length<2) { const fbM=beforeDay.match(/^\d+\s+(?:[A-Z]+\d+\s+)?(.+?)\s*\d?\s*(?:Lý|Thực)?$/i); if(fbM) name=fbM[1].trim(); }
+      if (!name) name=code!=='N/A'?code:'Môn học';
+      const type=/thực\s*hành/i.test(line)?'Thực hành':'Lý thuyết';
+      let tiets=[],room='N/A',weeks=[];
+      const bitmaskM=afterDay.match(/([_\d]{5,})/);
+      if (bitmaskM) {
+        tiets=parseBitmask(bitmaskM[0],15).filter(t=>t>=1&&t<=15);
+        const afterTiet=afterDay.slice(bitmaskM.index+bitmaskM[0].length).trim();
+        const roomM=afterTiet.match(/\b([A-Z][A-Za-z0-9._-]{1,}(?:[A-Z]|\d))\b/); room=roomM?roomM[1]:'N/A';
+        if(roomM){const afterRoom=afterTiet.slice(afterTiet.indexOf(roomM[0])+roomM[0].length).trim();const tuanM=afterRoom.match(/([_\d]{6,})/);if(tuanM)weeks=parseBitmask(tuanM[0],totalWks);}
+      } else {
+        const trng=afterDay.match(/[Tt]i[eế]t\s*(\d+)\s*[-–]\s*(\d+)/); if(trng) for(let i=+trng[1];i<=+trng[2];i++) tiets.push(i);
+        const roomM2=afterDay.match(/\b([A-Z][A-Za-z0-9._]{2,})\b/); if(roomM2) room=roomM2[1];
+        const tuanRng=line.match(/[Tt]u[aâ]n\s*([\d,\s\-–]+)/); if(tuanRng) weeks=parseBitmask(tuanRng[1]);
+      }
+      if (tiets.length===0) { warnings.push(`Không tìm được tiết: "${name}". Mặc định tiết 1-5.`); tiets=[1,2,3,4,5]; }
+      const s=buildSession(code,name,0,type,dayInfo,tiets,room,weeks); if(s) sessions.push(s);
+    }
+  }
+  return {sessions,warnings};
+}
+
+function assignColors(sessions) {
+  // B&W: use shades of grey per subject
+  const greys = ['#111','#333','#555','#777','#999','#bbb','#444','#666','#888','#aaa','#222','#333'];
+  const map={}; let ci=0;
+  return sessions.map(s=>{ if(!map[s.name]) map[s.name]=greys[ci++%greys.length]; return{...s,color:map[s.name]}; });
+}
+
+/* ── Paste indicator ── */
+function onTkbPaste(el) {
+  setTimeout(()=>{ const ind=document.getElementById('pasteIndicator'); if(el.value.trim().length>0) ind.style.display='block'; },100);
+}
+function onTkbInput(el) {
+  const ind=document.getElementById('pasteIndicator'); if(el.value.trim().length===0) ind.style.display='none';
+}
+
+/* ── Parse & go step 2 ── */
+function doParseAndNext() {
+  const rawDate=document.getElementById('semStart').value.trim();
+  if (rawDate) {
+    // Accept dd/mm/yyyy or dd-mm-yyyy or yyyy-mm-dd
+    const p=rawDate.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+    const p2=rawDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (p) semStart=new Date(+p[3],+p[2]-1,+p[1]);
+    else if (p2) semStart=new Date(+p2[1],+p2[2]-1,+p2[3]);
+  }
+  totalWks=30;
+  const txt=document.getElementById('tkbInput').value.trim();
+  if (!txt) { alert('Vui lòng dán nội dung TKB!'); return; }
+  const btn=document.getElementById('parseBtn');
+  btn.innerHTML='⏳ Đang phân tích...'; btn.disabled=true;
+  setTimeout(()=>{
+    btn.innerHTML='🔍 Phân tích TKB'; btn.disabled=false;
+    let sessions=[],warnings=[];
+    const tabSessions=parseTabFormat(txt);
+    if (tabSessions.length>0) {
+      sessions=tabSessions;
+      const sdM=txt.match(/tu[aâ]n\s*1\s*\(\s*(\d{1,2})\/(\d{1,2})\/(\d{4})\s*\)/i);
+      if (sdM) { semStart=new Date(+sdM[3],+sdM[2]-1,+sdM[1]); const si=document.getElementById('semStart'); if(si&&!si.value) si.value=`${String(sdM[1]).padStart(2,'0')}/${String(sdM[2]).padStart(2,'0')}/${sdM[3]}`; }
+    } else {
+      const res=parseTextFormat(txt); sessions=res.sessions; warnings=res.warnings;
+    }
+    if (!sessions.length) { alert('Không thể phân tích TKB. Hãy kiểm tra lại dữ liệu vừa dán!'); return; }
+    allSessions=assignColors(sessions); previewWeek=1;
+    renderPreview(allSessions,warnings); goStep(2);
+  },400);
+}
+
+/* ── Render preview ── */
+function renderPreview(sessions,warnings) {
+  const byName={};
+  for (const s of sessions) if(!byName[s.name]) byName[s.name]=s;
+  const uniqNames=Object.keys(byName);
+  const totalEvts=sessions.reduce((a,s)=>a+s.weeks.length,0);
+  const totalTC=uniqNames.reduce((a,n)=>a+(byName[n].credits||0),0);
+  document.getElementById('parseSummary').textContent=`Đã phân tích ${sessions.length} dòng lịch — ${uniqNames.length} môn học — ${totalEvts} sự kiện Calendar.`;
+  document.getElementById('statsGrid').innerHTML=`
+    <div class="scard"><div class="sval">${uniqNames.length}</div><div class="slb">Môn học</div></div>
+    <div class="scard"><div class="sval">${sessions.length}</div><div class="slb">Lịch phân bổ</div></div>
+    <div class="scard"><div class="sval">${totalEvts}</div><div class="slb">Sự kiện</div></div>
+    <div class="scard"><div class="sval">${totalTC}</div><div class="slb">Tín chỉ</div></div>`;
+  const warnEl=document.getElementById('parseWarn');
+  if(warnings&&warnings.length){warnEl.style.display='block';warnEl.innerHTML=`⚠️ ${warnings.slice(0,5).join('<br>')}`;} else warnEl.style.display='none';
+  const subGroups={};
+  for(const s of sessions)(subGroups[s.name]=subGroups[s.name]||[]).push(s);
+  document.getElementById('subList').innerHTML=Object.entries(subGroups).map(([name,arr])=>{
+    const days=[...new Set(arr.map(s=>s.dayVN))].join(', ');
+    const weeks=arr.flatMap(s=>s.weeks);
+    const uniqWeeks=[...new Set(weeks)].sort((a,b)=>a-b);
+    const tietRanges=[...new Set(arr.map(s=>`Tiết ${s.tiets[0]}–${s.tiets[s.tiets.length-1]}`))].join(' / ');
+    const rooms=[...new Set(arr.map(s=>s.room))].join(', ');
+    return `<div class="subitem">
+      <div class="subcol"></div>
+      <div style="flex:1">
+        <div class="subname">${name}</div>
+        <div class="submeta">
+          <span>📅 ${days}</span><span>⏰ ${tietRanges}</span>
+          <span>🏫 ${rooms}</span><span>📆 ${uniqWeeks.length} buổi</span>
+          ${arr[0].credits?`<span>📚 ${arr[0].credits} TC</span>`:''}
+        </div>
+      </div>
+      <span class="tag">${arr[0].type}</span>
+    </div>`;
+  }).join('');
+  previewWeek=1;
+  document.getElementById('weekLabel').textContent='Tuần 1';
+  document.getElementById('wkPrev').disabled=true;
+  document.getElementById('wkNext').disabled=(totalWks<=1);
+  updateWeekCalendar(sessions,1);
+  renderEvtSummary(sessions);
+}
+
+/* ── Week +/- buttons ── */
+function stepWeek(delta) {
+  const next=previewWeek+delta;
+  if (next<1||next>totalWks) return;
+  previewWeek=next;
+  document.getElementById('weekLabel').textContent=`Tuần ${previewWeek}`;
+  document.getElementById('wkPrev').disabled=(previewWeek===1);
+  document.getElementById('wkNext').disabled=(previewWeek===totalWks);
+  updateWeekDateLabel(previewWeek); updateWeekCalendar(allSessions,previewWeek);
+}
+function updateWeekDateLabel(wk) {
+  const el=document.getElementById('weekDateLabel');
+  if (!semStart){el.textContent='';return;}
+  const mon=new Date(semStart.getTime()+(wk-1)*7*86400000);
+  const sat=new Date(mon.getTime()+5*86400000);
+  const fmt=d=>d.toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit'});
+  el.textContent=`📅 ${fmt(mon)} – ${fmt(sat)}`;
+}
+function updateWeekCalendar(sessions,week) {
+  updateWeekDateLabel(week);
+  const active=sessions.filter(s=>s.weeks.includes(week));
+  const dayLabels=['Thứ Hai','Thứ Ba','Thứ Tư','Thứ Năm','Thứ Sáu','Thứ Bảy'];
+  const dayIdxs=[1,2,3,4,5,6];
+  const byDay={}; for(const d of dayIdxs) byDay[d]=[];
+  for(const s of active){if(byDay[s.dayIndex])byDay[s.dayIndex].push(s);}
+  for(const d of dayIdxs) byDay[d].sort((a,b)=>a.startT.localeCompare(b.startT));
+  if (!active.length) {
+    document.getElementById('wkCal').innerHTML=`<div style="text-align:center;padding:30px;color:#bbb;font-size:13px">😴 Tuần ${week} không có lịch học.</div>`;
+    return;
+  }
+  let html='<div class="wkcal">';
+  for(let i=0;i<6;i++){
+    const d=dayIdxs[i];
+    html+=`<div><div class="wkday-hd">${dayLabels[i]}</div><div class="wkday-col">`;
+    if(!byDay[d].length) html+='<div class="wkempty">—</div>';
+    else for(const s of byDay[d]){
+      const nm=s.name.length>28?s.name.slice(0,25)+'…':s.name;
+      html+=`<div class="wkblk" title="${s.name}\n${s.startT}–${s.endT}\n${s.room}">
+        <div class="wkblk-name">${nm}</div>
+        <div class="wkblk-time">${s.startT}–${s.endT}</div>
+        <div class="wkblk-room">🏫 ${s.room}</div>
+      </div>`;
+    }
+    html+='</div></div>';
+  }
+  html+='</div>';
+  document.getElementById('wkCal').innerHTML=html;
+}
+
+/* ── Event summary ── */
+function renderEvtSummary(sessions) {
+  const byName={};
+  for(const s of sessions)(byName[s.name]=byName[s.name]||[]).push(s);
+  let total=0;
+  let html='<table class="ptable"><thead><tr><th>Môn học</th><th>Lịch phân bổ</th><th>Số buổi</th></tr></thead><tbody>';
+  for(const [name,arr] of Object.entries(byName)){
+    const n=arr.reduce((a,s)=>a+s.weeks.length,0); total+=n;
+    const sched=arr.map(s=>`${s.dayVN} ${s.startT}–${s.endT}`).join('<br>');
+    html+=`<tr><td>${name}</td><td style="color:var(--txt3);font-size:11px">${sched}</td><td><span class="badge">${n}</span></td></tr>`;
+  }
+  html+=`</tbody></table><p style="margin-top:12px;font-size:12px;color:var(--txt2)">Tổng cộng <strong style="color:#111">${total} sự kiện</strong> sẽ được tạo.</p>`;
+  document.getElementById('evtSummary').innerHTML=html;
+}
+
+/* ── ICS generation ── */
+function dateForWeekDay(start,week,dayJS){const ms=86400000;const weekMon=new Date(start.getTime()+(week-1)*7*ms);const off=dayJS===0?6:dayJS-1;return new Date(weekMon.getTime()+off*ms);}
+function icsDate(date,timeStr){const y=date.getFullYear();const mo=String(date.getMonth()+1).padStart(2,'0');const d=String(date.getDate()).padStart(2,'0');const[h,mi]=timeStr.split(':');return`${y}${mo}${d}T${h.padStart(2,'0')}${mi.padStart(2,'0')}00`;}
+function icsNow(){const n=new Date();return[n.getUTCFullYear(),String(n.getUTCMonth()+1).padStart(2,'0'),String(n.getUTCDate()).padStart(2,'0')].join('')+'T'+[String(n.getUTCHours()).padStart(2,'0'),String(n.getUTCMinutes()).padStart(2,'0'),String(n.getUTCSeconds()).padStart(2,'0')].join('')+'Z';}
+function esc(s){return String(s).replace(/[\\;,]/g,'\\$&').replace(/\n/g,'\\n');}
+function fold(line){if(line.length<=75)return line;let r='',rem=line;while(rem.length>75){r+=rem.slice(0,75)+'\r\n ';rem=rem.slice(75);}return r+rem;}
+
+function generateICS(sessions) {
+  const start=semStart||new Date(); const stamp=icsNow(); let uid_idx=1;
+  const lines=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//TKB Converter//HCMC//VN','CALSCALE:GREGORIAN','METHOD:PUBLISH','X-WR-CALNAME:Thời Khóa Biểu','X-WR-TIMEZONE:Asia/Ho_Chi_Minh','BEGIN:VTIMEZONE','TZID:Asia/Ho_Chi_Minh','BEGIN:STANDARD','TZOFFSETFROM:+0700','TZOFFSETTO:+0700','TZNAME:ICT','DTSTART:19700101T000000','END:STANDARD','END:VTIMEZONE'];
+  for(const s of sessions){for(const wk of s.weeks){
+    const dt=dateForWeekDay(start,wk,s.dayIndex);const uid=`tkb-${uid_idx++}-${s.code}-w${wk}@tkbconv`;
+    const desc=esc([`Mã: ${s.code}`,`Loại: ${s.type}`,s.credits?`${s.credits} TC`:'',`Tiết ${s.tiets[0]}–${s.tiets[s.tiets.length-1]}`,`Tuần ${wk}/${totalWks}`].filter(Boolean).join(' | '));
+    lines.push('BEGIN:VEVENT',fold(`UID:${uid}`),`DTSTAMP:${stamp}`,fold(`DTSTART;TZID=Asia/Ho_Chi_Minh:${icsDate(dt,s.startT)}`),fold(`DTEND;TZID=Asia/Ho_Chi_Minh:${icsDate(dt,s.endT)}`),fold(`SUMMARY:${esc(s.name)}`),fold(`LOCATION:${esc(s.room)}`),fold(`DESCRIPTION:${desc}`),'STATUS:CONFIRMED','END:VEVENT');
+  }}
+  lines.push('END:VCALENDAR'); return lines.join('\r\n');
+}
+
+function downloadICS() {
+  if(!allSessions.length){alert('Không có dữ liệu!');return;}
+  const ics=generateICS(allSessions);
+  const blob=new Blob([ics],{type:'text/calendar;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=Object.assign(document.createElement('a'),{href:url,download:'ThoiKhoaBieu.ics'});
+  a.click(); URL.revokeObjectURL(url);
+  const btn=document.getElementById('dlBtn'); const orig=btn.innerHTML;
+  btn.innerHTML='✅ Đã tải xuống!'; setTimeout(()=>btn.innerHTML=orig,3000);
+}
+
+/* ── Init ── */
+(function init(){
+  // Leave semStart empty — user must type the date
+})();
+</script>
+</body>
+</html>
